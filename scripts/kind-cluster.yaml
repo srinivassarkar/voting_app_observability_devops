@@ -1,0 +1,18 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 30080
+    hostPort: 30080
+  - containerPort: 30081
+    hostPort: 30081
+  - containerPort: 30089
+    hostPort: 30089
+  - containerPort: 3000
+    hostPort: 3000
+  - containerPort: 9090
+    hostPort: 9090
+  - containerPort: 16686
+    hostPort: 16686
+
