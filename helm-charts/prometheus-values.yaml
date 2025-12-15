@@ -1,0 +1,20 @@
+grafana:
+  enabled: true
+  service:
+    type: NodePort
+    nodePort: 30090
+  adminPassword: admin
+
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    retention: 6h
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+
+alertmanager:
+  enabled: true
+
