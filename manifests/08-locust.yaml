@@ -1,0 +1,100 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: locust-script
+  namespace: voting-app
+data:
+  locustfile.py: |
+    from locust import HttpUser, task, between
+    import random
+
+    class VotingUser(HttpUser):
+        wait_time = between(1, 3)
+
+        @task
+        def vote(self):
+            self.client.post("/", data={"vote": random.choice(["a", "b"])})
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master
+  namespace: voting-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: locust-master
+  template:
+    metadata:
+      labels:
+        app: locust-master
+    spec:
+      containers:
+      - name: locust
+        image: locustio/locust:2.42.6
+        args:
+        - --master
+        - --host=http://vote
+        ports:
+        - containerPort: 8089
+        - containerPort: 5557
+        - containerPort: 5558
+        volumeMounts:
+        - name: locust-script
+          mountPath: /home/locust
+      volumes:
+      - name: locust-script
+        configMap:
+          name: locust-script
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-worker
+  namespace: voting-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: locust-worker
+  template:
+    metadata:
+      labels:
+        app: locust-worker
+    spec:
+      containers:
+      - name: locust
+        image: locustio/locust:2.42.6
+        args:
+        - --worker
+        - --master-host=locust-master
+        volumeMounts:
+        - name: locust-script
+          mountPath: /home/locust
+      volumes:
+      - name: locust-script
+        configMap:
+          name: locust-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-master
+  namespace: voting-app
+spec:
+  type: NodePort
+  selector:
+    app: locust-master
+  ports:
+  - name: web
+    port: 8089
+    targetPort: 8089
+    nodePort: 30089
+  - name: master
+    port: 5557
+    targetPort: 5557
+  - name: master-alt
+    port: 5558
+    targetPort: 5558
