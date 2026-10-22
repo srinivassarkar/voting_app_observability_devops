@@ -12,6 +12,8 @@ spec:
     metadata:
       labels:
         app: vote
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"
     spec:
       containers:
       - name: vote
@@ -42,4 +44,3 @@ spec:
   - port: 80
     targetPort: 80
     nodePort: 30080
-

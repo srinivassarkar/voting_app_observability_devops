@@ -1,0 +1,66 @@
+# Prometheus Alerting Rules & SLO Definitions
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: voting-app-slo-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: kube-prometheus-stack
+    release: monitoring
+spec:
+  groups:
+    - name: voting-app.slo
+      rules:
+        # SLO 1: Latency - 95% of requests must complete under 500ms
+        - alert: VoteServiceP95LatencyBreached
+          expr: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="voting-app", service="vote"}[5m])) by (le)) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            tier: application
+          annotations:
+            summary: "Vote service P95 latency exceeded 500ms SLO target"
+            description: "Current P95 latency is {{ $value | humanizeDuration }} over the last 5 minutes, exceeding the 500ms SLO."
+
+        # SLO 2: Availability - 99% of requests must return HTTP 2xx/3xx
+        - alert: VoteServiceHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="voting-app", service="vote", status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="voting-app", service="vote"}[5m]))
+            ) > 0.01
+          for: 3m
+          labels:
+            severity: critical
+            tier: application
+          annotations:
+            summary: "Vote service error rate exceeds 1% (SLO error budget burn)"
+            description: "Current 5xx HTTP error rate is {{ $value | humanizePercentage }}, exceeding the 1% error budget."
+
+        # Operational Infrastructure Alert: Redis memory pressure
+        - alert: RedisMemoryHighUsage
+          expr: |
+            container_memory_working_set_bytes{namespace="voting-app", pod=~"redis-.*", container="redis"}
+            /
+            kube_pod_container_resource_limits{namespace="voting-app", pod=~"redis-.*", resource="memory"} > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            tier: infrastructure
+          annotations:
+            summary: "Redis memory utilization exceeds 85% of container limit"
+            description: "Redis container memory usage is at {{ $value | humanizePercentage }}."
+
+        # Load Testing Guardrail: Locust Worker count drops
+        - alert: LocustWorkerCountDegraded
+          expr: |
+            count(kube_pod_status_phase{namespace="voting-app", pod=~"locust-worker-.*", phase="Running"} == 1) < 3
+          for: 2m
+          labels:
+            severity: warning
+            tier: testing
+          annotations:
+            summary: "Distributed load generator degraded"
+            description: "Less than 3 Locust workers are active (current: {{ $value }}), invalidating distributed load test assumptions."
